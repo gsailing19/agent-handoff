@@ -1,0 +1,17 @@
+# Agent handoff runtime files
+.claude/agent-handoffs/
+*.done
+
+# macOS
+.DS_Store
+
+# Editor
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.pyc
