@@ -14,7 +14,7 @@
 </p>
 <p align="center">
   <a href="README.zh-CN.md">
-    <img src="https://img.shields.io/badge/%F0%9F%87%A8%F0%9F%87%B3-简体中文-red?style=for-the-badge" alt="中文版">
+    <img src="logo/lang-zh.svg" alt="中文版" height="48">
   </a>
 </p>
 

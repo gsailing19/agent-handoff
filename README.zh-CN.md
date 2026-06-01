@@ -14,7 +14,7 @@
 </p>
 <p align="center">
   <a href="README.md">
-    <img src="https://img.shields.io/badge/%F0%9F%87%AC%F0%9F%87%A7-English-blue?style=for-the-badge" alt="English">
+    <img src="logo/lang-en.svg" alt="English" height="48">
   </a>
 </p>
 
