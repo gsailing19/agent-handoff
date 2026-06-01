@@ -22,6 +22,16 @@ SEQ=$(printf "%02d" $((EXISTING + 1)))
 
 HANDOFF_PATH=".claude/agent-handoffs/${SESSION_ID}/${SEQ}-${ROLE}-report.md"
 
+# Auto-detect install method and find the template
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# If we're inside a skill directory (scripts/ is under a skill root with SKILL.md), use skill template path
+if [ -f "$SCRIPT_DIR/../SKILL.md" ]; then
+    TEMPLATE_PATH="$SCRIPT_DIR/../templates/agent-handoff-template.md"
+else
+    # Traditional install — scripts were copied to ~/.claude/scripts/, template to ~/.claude/templates/
+    TEMPLATE_PATH="$HOME/.claude/templates/agent-handoff-template.md"
+fi
+
 cat << BLOCK
 
 ## Handoff Files
@@ -30,7 +40,7 @@ cat << BLOCK
 - \`${HANDOFF_PATH}\`
 
 ### Output Rules
-1. Write your COMPLETE report using the template format from \`~/.claude/templates/agent-handoff-template.md\`
+1. Write your COMPLETE report using the template format from \`${TEMPLATE_PATH}\`
    - YAML frontmatter: \`agent_role: "${ROLE}"\`, \`task_id: "${TASK_ID}"\`, \`session_id: "${SESSION_ID}"\`, \`sequence: ${SEQ}\`, \`status: "written"\`, \`handoff_type: "full"\`
    - 5 required sections (What Was Done / Output Artifacts / Decisions / Concerns / Next Agent Actions)
 2. End the file with \`<!-- handoff-end -->\`

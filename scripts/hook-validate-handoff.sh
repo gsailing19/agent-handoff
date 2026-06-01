@@ -29,9 +29,13 @@ if echo "$FILE_PATH" | grep -q "\.done$"; then
 fi
 
 # 校验脚本
-VALIDATOR="$HOME/.claude/scripts/validate-handoff.py"
+# Find validator — self-locating: resolves next to this script regardless of install path
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VALIDATOR="$SCRIPT_DIR/validate-handoff.py"
+
 if [ ! -f "$VALIDATOR" ]; then
-    echo "::error::Validator not found at $VALIDATOR" >&2
+    echo "::error::Validator not found at: $VALIDATOR" >&2
+    echo "::error::Expected validate-handoff.py in same directory as this hook script ($SCRIPT_DIR/)" >&2
     exit 2
 fi
 

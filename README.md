@@ -11,12 +11,30 @@
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"></a>
   <a href="docs/verification.md"><img src="https://img.shields.io/badge/tests-31%2F31%20passed-green" alt="Tests"></a>
+  <a href="SKILL.md"><img src="https://img.shields.io/badge/Claude%20Code-Skill-blueviolet" alt="Claude Code Skill"></a>
 </p>
 <p align="center">
   <a href="README.zh-CN.md">
     <img src="logo/lang-zh.svg" alt="中文版" height="48">
   </a>
 </p>
+
+## Install as Skill (recommended)
+
+```bash
+git clone https://github.com/gsailing19/agent-handoff.git ~/.claude/skills/agent-handoff/
+```
+
+Verify the install:
+```bash
+ls ~/.claude/skills/agent-handoff/SKILL.md
+```
+
+Restart Claude Code. The skill auto-discovers via SKILL.md.
+
+---
+
+**Alternatively, [traditional install](#traditional-install) is available below.** Choose ONE method.
 
 ## Problem
 
@@ -53,20 +71,24 @@ The system is enforced by hooks (PreToolUse validates prompts, PostToolUse valid
 | [Scripts Reference](docs/scripts.md) | All 4 scripts explained — usage, exit codes, errors |
 | [Verification Report](docs/verification.md) | 31/31 tests passed, fidelity benchmarks |
 | [Evolution](docs/evolution.md) | Self-improvement — failure logs, META rules, human gating |
+| [Canonical Rules](rules/agent-handoff.md) | Full rules text — source of truth for the protocol |
 
-## Quick Start
+## Traditional Install
 
 ### 1. Install
 
 ```bash
-cp scripts/* ~/.claude/scripts/
+cp scripts/*.sh scripts/*.py ~/.claude/scripts/
 cp templates/agent-handoff-template.md ~/.claude/templates/
 cp rules/agent-handoff.md ~/.claude/rules/
 ```
 
 ### 2. Configure hooks
 
-Merge the hooks from [examples/settings-hooks.json](examples/settings-hooks.json) into `~/.claude/settings.json`.
+Merge the hooks from [examples/settings-hooks.json](examples/settings-hooks.json) into
+`~/.claude/settings.json`. **Important:** The JSON uses skill paths by default. For
+traditional install, change each `command` from
+`~/.claude/skills/agent-handoff/scripts/` to `~/.claude/scripts/`.
 
 ### 3. Generate session and handoff block
 
@@ -99,11 +121,11 @@ python3 scripts/validate-handoff.py --recent-failures
 
 ## Architecture at a Glance
 
-| Layer | What | Where |
-|-------|------|-------|
-| Rules | Protocol spec + core principle | `~/.claude/rules/agent-handoff.md` |
-| Templates | Handoff file template | `~/.claude/templates/agent-handoff-template.md` |
-| Execution | Scripts, hooks, validator | `~/.claude/scripts/` + `~/.claude/settings.json` |
+| Layer | What | Where (Skill) | Where (Traditional) |
+|-------|------|---------------|---------------------|
+| Rules | Protocol spec + core principle | `~/.claude/skills/agent-handoff/rules/` | `~/.claude/rules/` |
+| Templates | Handoff file template | `~/.claude/skills/agent-handoff/templates/` | `~/.claude/templates/` |
+| Execution | Scripts, hooks, validator | `~/.claude/skills/agent-handoff/scripts/` | `~/.claude/scripts/` |
 
 ## Skills Using AHP
 

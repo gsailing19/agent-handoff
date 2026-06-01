@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/scripts/hook-validate-handoff.sh",
+            "command": "bash ~/.claude/skills/agent-handoff/scripts/hook-validate-handoff.sh",
             "timeout": 15,
             "async": false,
             "statusMessage": "Validating handoff file..."
@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/scripts/hook-validate-handoff.sh",
+            "command": "bash ~/.claude/skills/agent-handoff/scripts/hook-validate-handoff.sh",
             "timeout": 15,
             "async": false,
             "statusMessage": "Validating handoff file (Bash)..."
@@ -32,7 +32,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/scripts/pre-agent-handoff-check.sh",
+            "command": "bash ~/.claude/skills/agent-handoff/scripts/pre-agent-handoff-check.sh",
             "timeout": 10,
             "async": false,
             "statusMessage": "Checking Agent handoff instructions..."

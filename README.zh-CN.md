@@ -11,12 +11,30 @@
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"></a>
   <a href="docs/verification.md"><img src="https://img.shields.io/badge/%E6%B5%8B%E8%AF%95-31%2F31%20%E9%80%9A%E8%BF%87-green" alt="Tests"></a>
+  <a href="SKILL.md"><img src="https://img.shields.io/badge/Claude%20Code-Skill-blueviolet" alt="Claude Code Skill"></a>
 </p>
 <p align="center">
   <a href="README.md">
     <img src="logo/lang-en.svg" alt="English" height="48">
   </a>
 </p>
+
+## 安装为 Skill（推荐）
+
+```bash
+git clone https://github.com/gsailing19/agent-handoff.git ~/.claude/skills/agent-handoff/
+```
+
+验证安装：
+```bash
+ls ~/.claude/skills/agent-handoff/SKILL.md
+```
+
+重启 Claude Code 即可自动发现。Skill 通过 SKILL.md 自动加载。
+
+---
+
+**也可选择下方的[传统安装](#传统安装)方式。**请只选一种。
 
 ## 问题
 
@@ -53,20 +71,24 @@ AHP 完全绕过 Coordinator 的上下文。Agent 不再让 Coordinator "记住�
 | [脚本参考](docs/scripts.md) | 4 个脚本详解——用法、退出码、错误分类 |
 | [验证报告](docs/verification.md) | 31/31 测试通过，信息保真度对比 |
 | [进化机制](docs/evolution.md) | 自我改进——故障日志、META 规则、人类把关 |
+| [规范原文](rules/agent-handoff.md) | 完整规则文本——协议的权威来源 |
 
-## 快速上手
+## 传统安装
 
 ### 1. 安装
 
 ```bash
-cp scripts/* ~/.claude/scripts/
+cp scripts/*.sh scripts/*.py ~/.claude/scripts/
 cp templates/agent-handoff-template.md ~/.claude/templates/
 cp rules/agent-handoff.md ~/.claude/rules/
 ```
 
 ### 2. 配置 Hook
 
-将 [examples/settings-hooks.json](examples/settings-hooks.json) 中的 hook 合并到 `~/.claude/settings.json`。
+将 [examples/settings-hooks.json](examples/settings-hooks.json) 中的 hook 合并到
+`~/.claude/settings.json`。**注意：** JSON 默认使用 Skill 路径。传统安装需将
+每个 `command` 中的 `~/.claude/skills/agent-handoff/scripts/` 改为
+`~/.claude/scripts/`。
 
 ### 3. 生成 session 和 handoff 块
 
@@ -99,11 +121,11 @@ python3 scripts/validate-handoff.py --recent-failures
 
 ## 架构一览
 
-| 层 | 内容 | 位置 |
-|----|------|------|
-| 规则层 | 协议规范 + 核心原则 | `~/.claude/rules/agent-handoff.md` |
-| 模板层 | Handoff 文件模板 | `~/.claude/templates/agent-handoff-template.md` |
-| 执行层 | 脚本 + Hook + 校验器 | `~/.claude/scripts/` + `~/.claude/settings.json` |
+| 层 | 内容 | 位置 (Skill) | 位置 (传统) |
+|----|------|-------------|------------|
+| 规则层 | 协议规范 + 核心原则 | `~/.claude/skills/agent-handoff/rules/` | `~/.claude/rules/` |
+| 模板层 | Handoff 文件模板 | `~/.claude/skills/agent-handoff/templates/` | `~/.claude/templates/` |
+| 执行层 | 脚本 + Hook + 校验器 | `~/.claude/skills/agent-handoff/scripts/` | `~/.claude/scripts/` |
 
 ## 集成的 Skills
 

@@ -45,12 +45,15 @@ if [ "$HAS_RETURN_FORMAT" -eq 0 ]; then
 fi
 
 if [ ${#MISSING[@]} -gt 0 ]; then
+    # Self-locating: find handoff-init.sh next to this script
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    HANDOFF_INIT="$SCRIPT_DIR/handoff-init.sh"
     echo "::error::Agent dispatch BLOCKED — prompt missing handoff instructions:" >&2
     for m in "${MISSING[@]}"; do
         echo "  ❌ Missing: $m" >&2
     done
     echo "" >&2
-    echo "Fix: Run 'bash scripts/handoff-init.sh <role> <task-id>'" >&2
+    echo "Fix: Run 'bash $HANDOFF_INIT <role> <task-id>'" >&2
     echo "     Then copy the output into your Agent prompt." >&2
     echo "" >&2
     echo "If this is NOT a multi-agent task (single agent, no handoff needed)," >&2
