@@ -1,60 +1,76 @@
-# Agent Handoff Protocol (AHP)
-
 <p align="center">
   <img src="logo/agent-handoff-logo-256.png" alt="Agent Handoff Logo" width="128" height="128">
 </p>
 
-Claude Code's multi-Agent architecture is Hub-and-Spoke: Coordinator dispatches sub-agents → agents work independently → results return to Coordinator → Coordinator passes to the next agent. The problem is in the middle — when Coordinator's context gets compressed, information passed downstream can lose up to 80%.
+# Agent Handoff Protocol (AHP)
 
-AHP solves this: instead of the Coordinator "remembering" and "relaying" upstream results, agents write complete outputs to files, and downstream agents read them directly.
+<p align="center">
+  <strong>File-based inter-agent communication for Claude Code multi-agent collaboration.</strong>
+</p>
 
-**Core principle**: Agent writes full output to file → downstream agent reads the original → Coordinator only passes file paths (~50 bytes), never paraphrases content
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"></a>
+  <a href="docs/verification.md"><img src="https://img.shields.io/badge/tests-31%2F31%20passed-green" alt="Tests"></a>
+</p>
 
-## Why AHP
+## Problem
 
-Claude Code's Coordinator context gets compressed after receiving sub-agent returns. When that compressed information reaches the next agent, text-intensive tasks (research, analysis, writing) can lose up to 80% of data points (see [verification report](docs/verification.md)). AHP routes agent handoffs through the filesystem, bypassing the compression layer.
+Claude Code uses a Hub-and-Spoke architecture for multi-agent tasks: the Coordinator dispatches sub-agents, collects their results, then passes them on. Between Agent A and Agent B sits the Coordinator's context window — and when that context gets compressed, **up to 80% of the information** from the upstream agent can be lost before reaching the downstream agent.
+
+This is fatal for text-intensive tasks: research reports lose data points, analysis loses nuance, outlines lose structure. The Coordinator becomes a lossy middleman.
+
+## Solution
+
+AHP bypasses the Coordinator's context entirely. Instead of the Coordinator paraphrasing upstream results, agents write their complete output to files on disk. Downstream agents read those files directly. The Coordinator only passes file paths (~50 bytes), never the content itself.
+
+```
+Without AHP:   Agent A → Coordinator → [80% loss] → Agent B
+With AHP:      Agent A → file.md → Agent B reads it directly
+                                  Coordinator: "{path}"  (50 bytes, zero loss)
+```
+
+## How It Works
+
+1. **Agent writes** full output to `.claude/agent-handoffs/{session-id}/{seq}-{role}-report.md`
+2. **Agent signals completion** by creating a `.done` marker file
+3. **Coordinator passes** only the file path to the next agent
+4. **Downstream agent reads** the original file directly — no compression, no paraphrasing
+
+The system is enforced by hooks (PreToolUse validates prompts, PostToolUse validates output files) and a Python validator that checks file completeness, YAML frontmatter, section structure, and content quality.
 
 ## Documentation
 
-| Document | Contents |
-|----------|----------|
-| [docs/protocol.md](docs/protocol.md) | Full protocol spec — roles, file conventions, atomicity, checklists |
-| [docs/architecture.md](docs/architecture.md) | System architecture — component relationships, deployment, data flow |
-| [docs/template.md](docs/template.md) | Handoff file template — YAML frontmatter + five-section body |
-| [docs/scripts.md](docs/scripts.md) | Script reference — validate-handoff.py, hook-validate-handoff.sh |
-| [docs/verification.md](docs/verification.md) | Verification report — 31/31 tests passed, fidelity comparison |
-| [docs/evolution.md](docs/evolution.md) | Self-evolution mechanism — failure logs + META rules + human gating |
+| Document | What's Inside |
+|----------|---------------|
+| [Protocol Spec](docs/protocol.md) | Roles, file conventions, atomicity (`.done`), checklists |
+| [Architecture](docs/architecture.md) | System design — 4 layers, data flow, deployment |
+| [Template](docs/template.md) | Handoff file format — YAML frontmatter + 5 sections |
+| [Scripts Reference](docs/scripts.md) | All 4 scripts explained — usage, exit codes, errors |
+| [Verification Report](docs/verification.md) | 31/31 tests passed, fidelity benchmarks |
+| [Evolution](docs/evolution.md) | Self-improvement — failure logs, META rules, human gating |
 
 ## Quick Start
 
 ### 1. Install
 
 ```bash
-# Copy scripts to your global Claude config
 cp scripts/* ~/.claude/scripts/
-
-# Copy the handoff template
 cp templates/agent-handoff-template.md ~/.claude/templates/
-
-# Copy the rules file
 cp rules/agent-handoff.md ~/.claude/rules/
 ```
 
 ### 2. Configure hooks
 
-Add the hooks from [examples/settings-hooks.json](examples/settings-hooks.json) to your `~/.claude/settings.json`. These hooks:
-- **PreToolUse**: validates Agent prompts include handoff instructions before dispatch
-- **PostToolUse**: validates handoff files after Write/Bash operations
+Merge the hooks from [examples/settings-hooks.json](examples/settings-hooks.json) into `~/.claude/settings.json`.
 
-### 3. Run a multi-agent task
+### 3. Generate session and handoff block
 
 ```bash
-# Generate session-id
 SESSION_ID="$(date +%Y%m%d-%H%M%S)-$(uuidgen | head -c8)"
 mkdir -p .claude/agent-handoffs/$SESSION_ID
 ```
 
-In your Agent prompt, include:
+Add to your Agent prompt:
 
 ```
 ## Handoff Files
@@ -68,26 +84,26 @@ Return only: ✅ Handoff written to `{path}`. Summary: {one sentence}
 ### 4. Validate
 
 ```bash
-python3 scripts/validate-handoff.py --log-failures <handoff-file>
+python3 scripts/validate-handoff.py <handoff-file>
 python3 scripts/validate-handoff.py --recent-failures
 ```
 
-### 5. Trigger protocol evolution
+### 5. Evolve the protocol
 
-> "Analyze recent handoff failure records, identify repeating patterns, propose improvements to the protocol."
+> "Analyze recent handoff failure records. Identify repeating patterns. Propose improvements."
 
-## Three-Layer Coverage
+## Architecture at a Glance
 
-| Layer | Location | Scope |
-|-------|----------|-------|
-| Rules | `~/.claude/CLAUDE.md` + `~/.claude/rules/agent-handoff.md` | All projects |
-| Templates | `~/.claude/templates/agent-handoff-template.md` | All projects |
-| Execution | `~/.claude/scripts/` + `~/.claude/settings.json` (PostToolUse Hook) | All projects |
+| Layer | What | Where |
+|-------|------|-------|
+| Rules | Protocol spec + core principle | `~/.claude/rules/agent-handoff.md` |
+| Templates | Handoff file template | `~/.claude/templates/agent-handoff-template.md` |
+| Execution | Scripts, hooks, validator | `~/.claude/scripts/` + `~/.claude/settings.json` |
 
-## Integrated Skills
+## Skills Using AHP
 
 - **subagent-driven-development** — implementer → spec-reviewer → code-quality-reviewer
-- **write-draft** — 12-agent three-layer pipeline (research → outline → draft)
+- **write-draft** — 12-agent pipeline: research → outline → draft
 
 ## License
 
@@ -95,4 +111,4 @@ MIT — see [LICENSE](LICENSE)
 
 ---
 
-> Last updated: 2026-06-01
+> [中文版](README.zh-CN.md) · Last updated: 2026-06-01
