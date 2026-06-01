@@ -13,6 +13,10 @@
   <a href="docs/verification.md"><img src="https://img.shields.io/badge/tests-31%2F31%20passed-green" alt="Tests"></a>
 </p>
 
+<p align="center">
+  <a href="README.zh-CN.md">中文版</a>
+</p>
+
 ## Problem
 
 Claude Code uses a Hub-and-Spoke architecture for multi-agent tasks: the Coordinator dispatches sub-agents, collects their results, then passes them on. Between Agent A and Agent B sits the Coordinator's context window — and when that context gets compressed, **up to 80% of the information** from the upstream agent can be lost before reaching the downstream agent.
@@ -108,7 +112,3 @@ python3 scripts/validate-handoff.py --recent-failures
 ## License
 
 MIT — see [LICENSE](LICENSE)
-
----
-
-> [中文版](README.zh-CN.md) · Last updated: 2026-06-01

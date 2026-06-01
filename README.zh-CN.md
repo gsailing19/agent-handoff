@@ -13,6 +13,10 @@
   <a href="docs/verification.md"><img src="https://img.shields.io/badge/%E6%B5%8B%E8%AF%95-31%2F31%20%E9%80%9A%E8%BF%87-green" alt="Tests"></a>
 </p>
 
+<p align="center">
+  <a href="README.md">English</a>
+</p>
+
 ## 问题
 
 Claude Code 的多 Agent 采用 Hub-and-Spoke 架构：Coordinator（协调者）派发子 Agent，收集结果，再把结果传给下一个 Agent。Agent A 和 Agent B 之间隔着 Coordinator 的上下文窗口——当上下文被压缩时，上游 Agent **最多 80% 的信息**会在到达下游之前丢失。
@@ -108,7 +112,3 @@ python3 scripts/validate-handoff.py --recent-failures
 ## License
 
 MIT — 详见 [LICENSE](LICENSE)
-
----
-
-> [English](README.md) · 最后更新：2026-06-01
