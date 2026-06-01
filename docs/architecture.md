@@ -101,7 +101,7 @@ AHP 是 Coordinator 的**持久化外部记忆**，不是 Agent 间直连通道�
 | 全局 CLAUDE.md | `~/.claude/CLAUDE.md` | 所有项目 |
 | 协议规范 | `~/.claude/rules/agent-handoff.md` | 所有项目 |
 | Handoff 模板 | `~/.claude/templates/agent-handoff-template.md` | 所有项目 |
-| 项目 CLAUDE.md | `{project}/CLAUDE.md` | cc 项目 |
+| 项目 CLAUDE.md | 各项目的 `CLAUDE.md`（按需引用本协议） | 单个项目 |
 
 ### Skill 集成（17 文件）
 
