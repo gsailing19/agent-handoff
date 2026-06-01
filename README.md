@@ -1,5 +1,9 @@
 # Agent Handoff Protocol (AHP)
 
+<p align="center">
+  <img src="logo/agent-handoff-logo-256.png" alt="Agent Handoff Logo" width="128" height="128">
+</p>
+
 Claude Code's multi-Agent architecture is Hub-and-Spoke: Coordinator dispatches sub-agents → agents work independently → results return to Coordinator → Coordinator passes to the next agent. The problem is in the middle — when Coordinator's context gets compressed, information passed downstream can lose up to 80%.
 
 AHP solves this: instead of the Coordinator "remembering" and "relaying" upstream results, agents write complete outputs to files, and downstream agents read them directly.
