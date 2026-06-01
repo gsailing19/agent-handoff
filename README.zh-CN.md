@@ -12,9 +12,10 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"></a>
   <a href="docs/verification.md"><img src="https://img.shields.io/badge/%E6%B5%8B%E8%AF%95-31%2F31%20%E9%80%9A%E8%BF%87-green" alt="Tests"></a>
 </p>
-
 <p align="center">
-  <a href="README.md">English</a>
+  <a href="README.md">
+    <img src="https://img.shields.io/badge/%F0%9F%87%AC%F0%9F%87%A7-English-blue?style=for-the-badge" alt="English">
+  </a>
 </p>
 
 ## 问题
