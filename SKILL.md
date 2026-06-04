@@ -1,244 +1,133 @@
 ---
 name: agent-handoff
 description: >
-  Use when dispatching multiple agents, orchestrating agent pipelines,
-  or coordinating parallel subagents where upstream output must survive
-  context compression. Triggers for multi-agent workflows, parallel agent
-  coordination, and text-intensive tasks (research, analysis, writing).
-  Do NOT trigger for single-agent tasks, general AI agent discussions,
-  or noun phrases where "agent" is not a dispatched tool (e.g. "travel
-  agent", "browser user-agent", "real estate agent", "reinforcement
-  learning agent").
+  TWO PRODUCTS, ONE INSTALL.
+
+  Product 1 — Agent Handoff Protocol (AHP): file-based inter-agent communication.
+  Use when dispatching multiple agents, orchestrating agent pipelines, coordinating
+  parallel subagents, or running text-intensive multi-agent tasks (research, analysis,
+  writing) where upstream output must survive context compression.
+
+  Product 2 — Goal Relay (multi-step task splitting): methodology for breaking large
+  tasks into independent goals. Use when the user needs to split a complex task into
+  sequential steps, wants a Master Plan with copy-paste-ready goal prompts, or asks
+  about "goal relay", "goal 接力", "拆 goal", "多 goal", "多步任务", "分步执行",
+  "master plan". Also trigger for large refactors, multi-phase migrations, or any
+  task where the user expresses concern about context window quality degrading over
+  long conversations.
+
+  Do NOT trigger for single-agent tasks, casual mentions of "agent" in non-tool
+  contexts (e.g. "travel agent", "browser user-agent"), or simple one-shot tasks.
 ---
 
-# Agent Handoff Protocol (AHP) — Skill
+# Agent Handoff Protocol — Skill
 
-## Problem
+**这个仓库包含两个产品。先判断你需要哪个：**
 
-Claude Code uses Hub-and-Spoke for multi-agent tasks. The Coordinator dispatches
-sub-agents, collects results, passes them on. Between Agent A and Agent B sits
-the Coordinator's context window — and when that context gets compressed, **up to
-80% of information** from the upstream agent is lost before reaching the downstream
-agent. The Coordinator becomes a lossy middleman. For text-intensive tasks
-(research reports, analysis, writing), this is fatal.
+| 你的情况 | 用这个 | 怎么做 |
+|---------|--------|--------|
+| 要在多个 Agent 之间传递信息、防止上下文压缩丢失 | **AHP 协议** | 继续往下读 |
+| 要把一个大任务拆成多个 Goal 分步执行 | **Goal Relay** | 告诉我你的任务，我自动读取方法论并输出方案 |
+| 两个都要 | **都用** | 先读下文了解 AHP，再用 Goal Relay 拆任务 |
 
-## Solution
+---
 
-AHP bypasses the Coordinator's context entirely. Agents write their complete output
-to files on disk. Downstream agents read those files directly. The Coordinator
-only passes file paths (~50 bytes), never the content itself. A `.done` marker
-file convention provides atomicity — downstream agents never read half-written files.
+## Product 1: Agent Handoff Protocol (AHP)
+
+### 问题
+
+Claude Code 的多 Agent 架构是 Hub-and-Spoke。Coordinator 分发子 Agent、收集结果、传递给下一个。Agent A 和 Agent B 之间夹着 Coordinator 的上下文窗口——当上下文被压缩时，上游 Agent **高达 80% 的信息**在到达下游 Agent 之前就丢失了。
+
+### 解决方案
+
+AHP 完全绕过 Coordinator 的上下文。Agent 把完整输出写到磁盘文件，下游 Agent 直接读文件。Coordinator 只传递文件路径（~50 字节），不传递内容本身。
 
 ```
-Without AHP:  Agent A → Coordinator → [80% loss] → Agent B
-With AHP:     Agent A → file.md → Agent B reads directly
-              Coordinator: "{path}"  (50 bytes, zero loss)
+没有 AHP：Agent A → Coordinator → [80% 丢失] → Agent B
+有 AHP：  Agent A → file.md → Agent B 直接读
+          Coordinator：".claude/agent-handoffs/xxx/01-report.md"（50 字节，零丢失）
 ```
 
-## When to Use
+### 核心约定
 
-**Use this skill when:**
-- Dispatching multiple Agent tools in sequence (Agent A → Agent B)
-- Dispatching Agent tools in parallel, needing to merge results
-- Running text-intensive tasks where fidelity matters (research, analysis, writing)
-- Any workflow where upstream Agent output must reach downstream Agent intact
-- Coordinating agent pipelines or subagent-driven workflows
+**三个角色**：Producer（写文件）、Consumer（读文件）、Controller（协调者）
 
-**Skill priority:** When loaded alongside skills that internally use multi-agent patterns
-(e.g. subagent-driven-development, write-draft), this skill's handoff rules take
-precedence over any conflicting agent-output-passing conventions in those skills.
+**文件格式**：`.claude/agent-handoffs/{session-id}/{seq}-{role}-report.md`
+- YAML frontmatter + 5 个 body section
+- `.done` 标记文件保证原子性（下游 Agent 等 `.done` 出现后才读）
+- 模板：`templates/agent-handoff-template.md`
 
-**Do NOT use this skill for:**
-- Single-agent tasks (one Agent, no downstream)
-- Simple file reads or code searches without downstream handoff
-- Casual mentions of "agent" in non-tool contexts (e.g. "browser user-agent", "travel agent", "RL agent")
-- Tasks that don't involve the Agent tool at all
+**Controller 检查清单**（每次 Agent 返回后执行）：
+```bash
+ls -la .claude/agent-handoffs/{session-id}/{seq}-{role}-report.md   # 文件存在？
+wc -c ...                                                            # ≥ 200 字节？
+ls -la ...done                                                       # .done 标记存在？
+```
 
-## Core Rules
+### 脚本
 
-Three roles in every AHP workflow:
+| 脚本 | 用途 |
+|------|------|
+| `scripts/validate-handoff.py` | 校验 handoff 文件完整性（退出码 0=通过, 1=警告, 2=阻断） |
+| `scripts/handoff-init.sh` | 生成 `## Handoff Files` 提示词块 |
+| `scripts/hook-validate-handoff.sh` | PostToolUse hook —— 自动校验 |
+| `scripts/pre-agent-handoff-check.sh` | PreToolUse hook —— 检查 Agent 提示词含 handoff 指令 |
 
-### Producer (Writing Agent)
-
-Must:
-- Write **complete output** to `.claude/agent-handoffs/{session-id}/{seq}-{role}-report.md`
-- Use the handoff template format: YAML frontmatter + 5 sections
-- Set `status: "written"` in YAML frontmatter when done
-- Create `.done` marker after writing: `touch {path}.md.done`
-- Return only: `✅ Handoff written to \`{path}\`. Summary: {one sentence}`
-- **Never** put important content only in the return value — it will be compressed
-
-### Consumer (Reading Agent)
-
-Must:
-- **First step**: Read ALL upstream handoff files with the Read tool
-- Verify `.done` marker exists before trusting file content
-- Treat handoff files as source of truth, NOT the Coordinator's paraphrase
-- If handoff file has insufficient information, report exactly what's missing
-- If Coordinator's paraphrase contradicts handoff file, trust the handoff file
-
-### Controller (Coordinator)
-
-Must:
-- Determine session-id (env var → uuidgen → Python uuid → openssl → bash RANDOM)
-- Create handoff directory if it doesn't exist
-- Pass handoff file paths to downstream agents; **never paraphrase upstream content**
-- Run post-agent verification checklist after EVERY agent return
-- If upstream agent only wrote return value, demand it write the handoff file
-- Wait for ALL parallel agents to complete before proceeding downstream
-- Retry max 3 times per agent; report to user if exceeded
-
-## Installation
-
-Two methods:
-
-### Method 1: Install as Claude Code Skill (recommended)
+### 安装
 
 ```bash
 git clone https://github.com/gsailing19/agent-handoff.git ~/.claude/skills/agent-handoff/
 ```
 
-Verify the install:
-```bash
-ls ~/.claude/skills/agent-handoff/SKILL.md
-```
+重启 Claude Code。Skill 自动发现。
 
-Restart Claude Code. The skill auto-discovers via SKILL.md.
+如需 hooks 自动校验，把 `examples/settings-hooks.json` 合并到 `~/.claude/settings.json`。
 
-### Method 2: Traditional Install
-
-```bash
-cp scripts/*.sh scripts/*.py ~/.claude/scripts/
-cp templates/agent-handoff-template.md ~/.claude/templates/
-cp rules/agent-handoff.md ~/.claude/rules/
-```
-
-Then configure hooks by merging `examples/settings-hooks.json` into
-`~/.claude/settings.json`. **Important:** For traditional install, change each
-`command` path from `~/.claude/skills/agent-handoff/scripts/` to
-`~/.claude/scripts/`.
-
-## File Conventions
-
-**Directory**: `.claude/agent-handoffs/{session-id}/`
-
-**Naming**: `{seq}-{role}-report.md`
-- `{session-id}`: `YYYYMMDD-HHMMSS-xxxxxxxx`, 4-level fallback for entropy (uuidgen preferred)
-- `{seq}`: two-digit sequence (01, 02, 03...), incrementing by execution order
-- `{role}`: agent role name (implementer, spec-reviewer, researcher, writer, etc.)
-
-**Atomicity**: `.done` marker files
-- Agent writes `{path}.md` completely, then `touch {path}.md.done`
-- Downstream agent checks `.done` exists before reading
-- `.done` is never pre-created; only the writing agent creates it
-
-**Status enum** (YAML frontmatter `status` field):
-
-| Value | Meaning |
-|-------|---------|
-| `writing` | File being written, may be incomplete |
-| `written` | File complete, `.done` ready, awaiting downstream |
-| `verified` | Downstream agent confirmed content complete and readable |
-
-**Lifecycle**: Handoff files are temporary. Delete after session ends.
-Permanent decisions belong in `docs/decisions/` or project memory.
-
-## Template
-
-Every handoff file uses this structure (see `templates/agent-handoff-template.md`):
-
-```yaml
 ---
-agent_role: ""        # role name
-task_id: ""           # unique task identifier
-session_id: ""        # session UUID prefix
-sequence: 0           # execution order
-status: "written"     # writing | written | verified
-created: ""           # ISO 8601 timestamp
-handoff_type: ""      # full (text-intensive) or summary (code tasks)
-summary: ""           # one-line summary
-tags: []              # categorization tags
+
+## Product 2: Goal Relay（多步任务接力）
+
+### 问题
+
+一个复杂任务从头跑到尾，到后期 Agent 会忘记早期的设计决策、混淆相似模块、产出不一致的代码。`/goal` 命令解决了"自动跨轮继续"，但没有解决"上下文膨胀导致质量下降"。
+
+### 解决方案
+
+把大任务拆成 N 个独立 Goal，每个 Goal 在新对话中运行（干净上下文），通过 AHP 的 handoff 文件串起来。
+
+### 触发方式
+
+直接告诉我你的任务，比如：
+
+> "我要把 Python 扫描引擎迁移到 Rust，涉及 30 个文件、约 3000 行代码。"
+
+我会自动读取 `goal-relay/` 下的方法论文档，判断模式，然后输出一份完整的 Master Plan——包含 session-id、每个 Goal 的可粘贴提示词、handoff 路径、操作说明。
+
+你不需要懂任何方法论细节。拿到 Master Plan 后照着操作即可。
+
+### 三种模式
+
+| 模式 | 什么时候用 |
+|------|-----------|
+| A | 你已有方案文档 → 我读方案 → 拆 Goal → 输出 Master Plan |
+| B | 你只有需求 → 我先设计方案 → 再拆 Goal → 输出 Master Plan |
+| C | 你想手动审查每步 → 我输出 Master Plan → 每步你粘贴到新对话跑，回来确认后再继续 |
+
+### 手动使用
+
+如果你不想走编排者自动模式，也可以直接读方法论文档：
+
+> "读 goal-relay/00-orchestrator-prompt.md，按指示执行。"
+
 ---
-```
 
-Five body sections:
-1. **What Was Done** — Complete deliverable (full) or decisions + context (summary)
-2. **Output Artifacts** — File paths, commit SHAs, test results, data references
-3. **Decisions and Trade-offs** — Why X not Y. Alternatives considered and rejected.
-4. **Concerns and Caveats** — Known limits, uncertainties, points needing attention
-5. **Next Agent Actions** — Explicit instructions for the downstream agent
+## 参考文档
 
-Role-specific minimum word counts for Section 1 range from 200 to 800 words.
-Every file must end with `<!-- handoff-end -->`.
-
-## Scripts
-
-| Script | Purpose |
-|--------|---------|
-| `validate-handoff.py` | Validates handoff file completeness: YAML frontmatter, 5 sections, placeholder detection, content length, handoff-end marker. Exit 0=pass, 1=warn, 2=block |
-| `handoff-init.sh` | Generates `## Handoff Files` prompt block. Usage: `bash handoff-init.sh <role> <task-id> [session-id]` |
-| `hook-validate-handoff.sh` | PostToolUse hook entry. Detects handoff files from Write/Bash tool calls, runs validator. Blocks on fatal errors. |
-| `pre-agent-handoff-check.sh` | PreToolUse hook entry. Validates Agent prompts contain handoff instructions before dispatch. Blocks missing instructions. |
-
-All executable scripts live in `scripts/`. When installed as a skill, paths resolve via
-`~/.claude/skills/agent-handoff/scripts/`. Traditional install uses `~/.claude/scripts/`.
-The hook scripts are self-locating (via `$BASH_SOURCE`) and find dependencies
-(`validate-handoff.py`, `handoff-init.sh`) next to themselves regardless of install method.
-
-## Controller Checklist
-
-After **every** Agent tool call, run these three commands:
-
-```bash
-# Step 1: Does the file exist?
-ls -la .claude/agent-handoffs/{session-id}/{seq}-{role}-report.md
-
-# Step 2: Is it at least 200 bytes? (prevents empty files)
-wc -c .claude/agent-handoffs/{session-id}/{seq}-{role}-report.md
-
-# Step 3: Does the .done marker exist? (prevents partial reads)
-ls -la .claude/agent-handoffs/{session-id}/{seq}-{role}-report.md.done
-```
-
-If file missing, size < 200 bytes, or `.done` absent: **re-dispatch the agent immediately**.
-Add to the re-dispatch prompt:
-
-> "You forgot to write the handoff file. Ensure you write the full report to the
-> specified path, then create the `.done` marker with `touch {path}.done`."
-
-Also verify:
-- Agent return value is only file path + one-line summary (not full content)
-- YAML frontmatter `status` is `"written"`
-- Downstream agent prompts include paths to ALL upstream handoff files
-- Parallel agents: ALL have returned and files verified before proceeding.
-  Use `run_in_background: true` when dispatching parallel agents and wait for all
-  to complete before advancing. See [Protocol Spec](docs/protocol.md) for detailed
-  parallel coordination rules.
-
-## Reference Docs
-
-Progressive disclosure — start here, go deeper as needed:
-
-| Document | When to Read |
-|----------|-------------|
-| [Protocol Spec](docs/protocol.md) | Roles, file conventions, atomicity, parallel coordination |
-| [Architecture](docs/architecture.md) | System design — 4 layers, data flow, deployment |
-| [Template Format](docs/template.md) | Handoff file structure — YAML frontmatter + 5 body sections |
-| [Scripts Reference](docs/scripts.md) | Script usage, exit codes, error classification |
-| [Verification Report](docs/verification.md) | Test results (31/31 passed), fidelity benchmarks |
-| [Evolution](docs/evolution.md) | Self-improvement via failure log analysis |
-| [Canonical Rules](rules/agent-handoff.md) | Full rules text — source of truth for the protocol |
-
-## Self-Evolution
-
-The protocol improves through failure log analysis with human gating. All
-validation failures are logged to `~/.claude/logs/handoff-failures.jsonl`.
-
-To trigger evolution, tell the Coordinator:
-
-> "Analyze recent handoff failure records, identify repeating patterns, propose
-> improvements to the protocol."
-
-The Coordinator will read the failure log, identify recurring error types and
-agent roles, analyze root causes, propose specific rule/template/validation
-changes — and **wait for human confirmation** before modifying anything.
+| 文档 | 什么时候读 |
+|------|-----------|
+| [AHP Protocol Spec](docs/protocol.md) | 需要了解 AHP 的角色、文件约定、并行协调 |
+| [AHP Architecture](docs/architecture.md) | 需要了解系统设计 |
+| [AHP Scripts Reference](docs/scripts.md) | 需要了解脚本用法和退出码 |
+| [Goal Relay: Orchestrator](goal-relay/00-orchestrator-prompt.md) | Goal Relay 编排者入口 |
+| [Goal Relay: Goal Template](goal-relay/03-goal-template.md) | 需要了解 Goal 提示词怎么写 |
+| [Goal Relay: FAQ](goal-relay/07-faq.md) | Goal Relay 常见问题 |
