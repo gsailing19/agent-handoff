@@ -1,136 +1,65 @@
 <p align="center">
-  <img src="logo/agent-handoff-logo-256.png" alt="Agent Handoff Logo" width="128" height="128">
+  <img src="logo/agent-handoff-logo-256.png" alt="Agent Handoff Logo" width="96" height="96">
 </p>
 
-# Agent Handoff Protocol (AHP)
+# Agent Handoff — AHP + Goal Relay
 
-<p align="center">
-  <strong>基于文件的多 Agent 间通信协议，专为 Claude Code 多智能体协作设计。</strong>
-</p>
+**一个仓库，两个工具。**
 
-<p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"></a>
-  <a href="docs/verification.md"><img src="https://img.shields.io/badge/%E6%B5%8B%E8%AF%95-31%2F31%20%E9%80%9A%E8%BF%87-green" alt="Tests"></a>
-  <a href="SKILL.md"><img src="https://img.shields.io/badge/Claude%20Code-Skill-blueviolet" alt="Claude Code Skill"></a>
-</p>
-<p align="center">
-  <a href="README.md">
-    <img src="logo/lang-en.svg" alt="English" height="48">
-  </a>
-</p>
+| | Agent Handoff Protocol | Goal Relay（接力工作法） |
+|------|------------------------|------------|
+| **解决什么** | 多个 Agent 之间传递信息，防止上下文压缩丢失 80% 内容 | 大任务拆成多个 Goal，每个 Goal 在新对话中以干净上下文独立运行 |
+| **什么时候用** | 调度多个 Agent、并行子任务、文本密集型多 Agent 工作流 | 大型重构、分阶段迁移、多模块顺序实现、需要人在回路质量把关 |
+| **怎么触发** | Claude Code 在多 Agent 场景自动加载 | 直接告诉 Claude 你的任务，自动读方法论并输出 Master Plan |
+| **产出** | 结构化的 handoff 文件（`.done` 保证原子性） | 完整的 Master Plan：session-id + 每个 Goal 的可粘贴提示词 + 操作说明 |
 
-## 安装为 Skill（推荐）
+---
+
+## 安装（一行）
 
 ```bash
 git clone https://github.com/gsailing19/agent-handoff.git ~/.claude/skills/agent-handoff/
 ```
 
-验证安装：
-```bash
-ls ~/.claude/skills/agent-handoff/SKILL.md
-```
+重启 Claude Code。两个工具同时就绪，无需分别安装。
 
-重启 Claude Code 即可自动发现。Skill 通过 SKILL.md 自动加载。
+> **可选**：把 `examples/settings-hooks.json` 合并到 `~/.claude/settings.json` 以获得自动 handoff 校验。
 
 ---
 
-**也可选择下方的[传统安装](#传统安装)方式。**请只选一种。
+## 快速开始
 
-## 问题
+### 用 AHP（Agent 间传递信息）
 
-Claude Code 的多 Agent 采用 Hub-and-Spoke 架构：Coordinator（协调者）派发子 Agent，收集结果，再把结果传给下一个 Agent。Agent A 和 Agent B 之间隔着 Coordinator 的上下文窗口——当上下文被压缩时，上游 Agent **最多 80% 的信息**会在到达下游之前丢失。
+调度多个 Agent 时，告诉每个 Agent handoff 文件路径即可。SKILL.md 中的规范会自动生效。
 
-这对文本密集型任务是致命的：研究报告丢失数据点，分析报告丢失细节，大纲丢失结构。Coordinator 成了一个有损的中间人。
+详细协议见 [docs/protocol.md](docs/protocol.md)。
 
-## 解决方案
+### 用 Goal Relay（大任务分步执行）
 
-AHP 完全绕过 Coordinator 的上下文。Agent 不再让 Coordinator "记住和转述"结果，而是把完整输出写入文件。下游 Agent 直接读取原始文件。Coordinator 只传递文件路径（约 50 字节），不传递内容本身。
+直接在 Claude Code 中说你的任务，比如：
 
-```
-没有 AHP：  Agent A → Coordinator → [丢失 80%] → Agent B
-有了 AHP：  Agent A → file.md → Agent B 直接读取原文
-                    Coordinator 只传："{路径}"（50 字节，零损失）
-```
+> "我要把 2000 行的认证模块从 JWT 迁到 OAuth，涉及 15 个文件"
 
-## 工作原理
+Claude 自动读方法论 → 判断模式 → 输出 Master Plan。拿到后照着操作就行。不需要懂任何方法论细节。
 
-1. **Agent 写入**完整输出到 `.claude/agent-handoffs/{session-id}/{seq}-{role}-report.md`
-2. **Agent 标记完成**，创建 `.done` 标记文件
-3. **Coordinator 只传文件路径**给下一个 Agent
-4. **下游 Agent 直接读取**原始文件——无压缩、无转述、无信息丢失
-
-系统通过 Hook 强制约束：PreToolUse 检查 Agent prompt 是否包含 handoff 指令，PostToolUse 校验输出文件，Python 校验器检查文件完整性、YAML frontmatter、章节结构和内容质量。
+---
 
 ## 文档
 
 | 文档 | 内容 |
 |------|------|
-| [协议规范](docs/protocol.md) | 角色职责、文件约定、原子性机制（`.done`）、检查清单 |
-| [系统架构](docs/architecture.md) | 四层架构设计、组件关系、数据流、部署 |
-| [模板说明](docs/template.md) | Handoff 文件格式——YAML frontmatter + 五段正文 |
-| [脚本参考](docs/scripts.md) | 4 个脚本详解——用法、退出码、错误分类 |
-| [验证报告](docs/verification.md) | 31/31 测试通过，信息保真度对比 |
-| [进化机制](docs/evolution.md) | 自我改进——故障日志、META 规则、人类把关 |
-| [规范原文](rules/agent-handoff.md) | 完整规则文本——协议的权威来源 |
+| [AHP 协议规范](docs/protocol.md) | 角色、文件约定、原子性（`.done`）、检查清单 |
+| [AHP 架构](docs/architecture.md) | 系统设计 |
+| [AHP 模板](docs/template.md) | Handoff 文件格式 |
+| [AHP 脚本](docs/scripts.md) | 4 个脚本的用法和退出码 |
+| [AHP 验证报告](docs/verification.md) | 31/31 测试通过 |
+| [AHP 自进化](docs/evolution.md) | 失败日志分析 + 人类把关 |
+| [AHP 规则](rules/agent-handoff.md) | 协议完整规范文本 |
+| [Goal Relay 编排者入口](goal-relay/00-orchestrator-prompt.md) | 编排者自动模式入口 |
+| [Goal Relay 目录](goal-relay/) | 完整方法论（10 个文件） |
 
-## 传统安装
-
-### 1. 安装
-
-```bash
-cp scripts/*.sh scripts/*.py ~/.claude/scripts/
-cp templates/agent-handoff-template.md ~/.claude/templates/
-cp rules/agent-handoff.md ~/.claude/rules/
-```
-
-### 2. 配置 Hook
-
-将 [examples/settings-hooks.json](examples/settings-hooks.json) 中的 hook 合并到
-`~/.claude/settings.json`。**注意：** JSON 默认使用 Skill 路径。传统安装需将
-每个 `command` 中的 `~/.claude/skills/agent-handoff/scripts/` 改为
-`~/.claude/scripts/`。
-
-### 3. 生成 session 和 handoff 块
-
-```bash
-SESSION_ID="$(date +%Y%m%d-%H%M%S)-$(uuidgen | head -c8)"
-mkdir -p .claude/agent-handoffs/$SESSION_ID
-```
-
-在 Agent prompt 中加入：
-
-```
-## Handoff Files
-### Output
-- .claude/agent-handoffs/{session-id}/01-{role}-report.md
-
-After writing: touch {path}.done
-Return only: ✅ Handoff written to `{path}`. Summary: {one sentence}
-```
-
-### 4. 校验
-
-```bash
-python3 scripts/validate-handoff.py <handoff-file>
-python3 scripts/validate-handoff.py --recent-failures
-```
-
-### 5. 触发协议进化
-
-> "分析最近的 handoff 失败记录，抽象出重复模式，提出对协议的改进方案。"
-
-## 架构一览
-
-| 层 | 内容 | 位置 (Skill) | 位置 (传统) |
-|----|------|-------------|------------|
-| 规则层 | 协议规范 + 核心原则 | `~/.claude/skills/agent-handoff/rules/` | `~/.claude/rules/` |
-| 模板层 | Handoff 文件模板 | `~/.claude/skills/agent-handoff/templates/` | `~/.claude/templates/` |
-| 执行层 | 脚本 + Hook + 校验器 | `~/.claude/skills/agent-handoff/scripts/` | `~/.claude/scripts/` |
-
-## 集成的 Skills
-
-- **subagent-driven-development** — implementer → spec-reviewer → code-quality-reviewer
-- **write-draft** — 12 Agent 三层流水线：研究 → 大纲 → 撰写
+---
 
 ## License
 
